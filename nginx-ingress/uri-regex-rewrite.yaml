@@ -1,0 +1,58 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: regex-rewrite
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: regex-rewrite.example.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/subfolder(/|$)(.*)"
+        backend:
+          service:
+            name: regex-rewrite
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: regex-rewrite
+spec:
+  type: ClusterIP
+  selector:
+    app: regex-rewrite
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: regex-rewrite
+  labels:
+    app: regex-rewrite
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: regex-rewrite
+  template:
+    metadata:
+      labels:
+        app: regex-rewrite
+    spec:
+      containers:
+      - name: echo
+        image: mendhak/http-https-echo:28
+        env:
+        - name: HTTP_PORT
+          value: "8080"
+        - name: HTTPS_PORT
+          value: "8443"

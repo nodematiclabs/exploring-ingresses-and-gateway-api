@@ -1,0 +1,139 @@
+---
+apiVersion: compute.cnrm.cloud.google.com/v1beta1
+kind: ComputeAddress
+metadata:
+  name: before-and-after
+spec:
+  location: global
+  resourceID: before-and-after
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: before-and-after
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: before-and-after
+spec:
+  rules:
+  - host: before.example.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: before
+            port:
+              number: 80
+  - host: after.example.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: after
+            port:
+              number: 80
+---
+apiVersion: compute.cnrm.cloud.google.com/v1beta1
+kind: ComputeSecurityPolicy
+metadata:
+  name: before
+spec:
+  rule:
+  - action: redirect
+    priority: 2147483647
+    match:
+      versionedExpr: SRC_IPS_V1
+      config:
+        srcIpRanges:
+        - "*"
+    redirectOptions:
+      target: "http://after.example.com"
+      type: EXTERNAL_302
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: before
+spec:
+  securityPolicy:
+    name: "before"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: before
+  annotations:
+    cloud.google.com/backend-config: '{"default": "before"}'
+spec:
+  type: NodePort
+  selector:
+    app: before
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: before
+  labels:
+    app: before
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: before
+  template:
+    metadata:
+      labels:
+        app: before
+    spec:
+      containers:
+      - name: echo
+        image: mendhak/http-https-echo:latest
+        env:
+        - name: HTTP_PORT
+          value: "8080"
+        - name: HTTPS_PORT
+          value: "8443"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: after
+spec:
+  type: NodePort
+  selector:
+    app: after
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: after
+  labels:
+    app: after
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: after
+  template:
+    metadata:
+      labels:
+        app: after
+    spec:
+      containers:
+      - name: echo
+        image: mendhak/http-https-echo:latest
+        env:
+        - name: HTTP_PORT
+          value: "8080"
+        - name: HTTPS_PORT
+          value: "8443"

@@ -1,0 +1,77 @@
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: protocol-redirect
+spec:
+  domains:
+  - protocol-redirect.example.com
+---
+apiVersion: compute.cnrm.cloud.google.com/v1beta1
+kind: ComputeAddress
+metadata:
+  name: protocol-redirect
+spec:
+  location: global
+  resourceID: protocol-redirect
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: protocol-redirect
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: protocol-redirect
+    networking.gke.io/v1beta1.FrontendConfig: protocol-redirect
+    networking.gke.io/managed-certificates: protocol-redirect
+spec:
+  defaultBackend:
+    service:
+      name: https
+      port:
+        number: 80
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: protocol-redirect
+spec:
+  redirectToHttps:
+    enabled: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: https
+spec:
+  type: NodePort
+  selector:
+    app: https
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: https
+  labels:
+    app: https
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: https
+  template:
+    metadata:
+      labels:
+        app: https
+    spec:
+      containers:
+      - name: echo
+        image: mendhak/http-https-echo:latest
+        env:
+        - name: HTTP_PORT
+          value: "8080"
+        - name: HTTPS_PORT
+          value: "8443"

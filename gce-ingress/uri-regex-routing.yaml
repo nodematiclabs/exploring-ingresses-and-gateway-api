@@ -1,0 +1,195 @@
+---
+apiVersion: compute.cnrm.cloud.google.com/v1beta1
+kind: ComputeAddress
+metadata:
+  name: regex-routing
+spec:
+  location: global
+  resourceID: regex-routing
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: regex-routing
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: regex-routing
+spec:
+  rules:
+  - host: regex-routing.example.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: regex-routing
+            port:
+              number: 80
+  - host: regex-two.example.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: regex-two
+            port:
+              number: 80
+  - host: regex-one.example.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: regex-one
+            port:
+              number: 80
+---
+apiVersion: compute.cnrm.cloud.google.com/v1beta1
+kind: ComputeSecurityPolicy
+metadata:
+  name: regex-routing
+spec:
+  rule:
+  - action: redirect
+    priority: 0
+    match:
+      expr:
+        expression: |
+          request.path.matches('/[A-Za-z]*')
+    redirectOptions:
+      target: "http://regex-one.example.com"
+      type: EXTERNAL_302
+  - action: redirect
+    priority: 2147483647
+    match:
+      versionedExpr: SRC_IPS_V1
+      config:
+        srcIpRanges:
+        - "*"
+    redirectOptions:
+      target: "http://regex-two.example.com"
+      type: EXTERNAL_302
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: regex-routing
+spec:
+  securityPolicy:
+    name: "regex-routing"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: regex-routing
+  annotations:
+    cloud.google.com/backend-config: '{"default": "regex-routing"}'
+spec:
+  type: NodePort
+  selector:
+    app: regex-routing
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: regex-routing
+  labels:
+    app: regex-routing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: regex-routing
+  template:
+    metadata:
+      labels:
+        app: regex-routing
+    spec:
+      containers:
+      - name: echo
+        image: mendhak/http-https-echo:latest
+        env:
+        - name: HTTP_PORT
+          value: "8080"
+        - name: HTTPS_PORT
+          value: "8443"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: regex-one
+spec:
+  type: NodePort
+  selector:
+    app: regex-one
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: regex-one
+  labels:
+    app: regex-one
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: regex-one
+  template:
+    metadata:
+      labels:
+        app: regex-one
+    spec:
+      containers:
+      - name: echo
+        image: mendhak/http-https-echo:latest
+        env:
+        - name: HTTP_PORT
+          value: "8080"
+        - name: HTTPS_PORT
+          value: "8443"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: regex-two
+spec:
+  type: NodePort
+  selector:
+    app: regex-two
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: regex-two
+  labels:
+    app: regex-two
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: regex-two
+  template:
+    metadata:
+      labels:
+        app: regex-two
+    spec:
+      containers:
+      - name: echo
+        image: mendhak/http-https-echo:latest
+        env:
+        - name: HTTP_PORT
+          value: "8080"
+        - name: HTTPS_PORT
+          value: "8443"

@@ -1,0 +1,129 @@
+---
+apiVersion: compute.cnrm.cloud.google.com/v1beta1
+kind: ComputeAddress
+metadata:
+  name: hosts
+spec:
+  location: global
+  resourceID: hosts
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: hosts
+spec:
+  gatewayClassName: gke-l7-global-external-managed
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      kinds:
+      - kind: HTTPRoute
+  addresses:
+  - type: NamedAddress
+    value: "hosts"
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: one
+spec:
+  parentRefs:
+  - kind: Gateway
+    name: hosts
+  hostnames:
+  - "one.example.com"
+  rules:
+  - backendRefs:
+    - name: one
+      port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two
+spec:
+  parentRefs:
+  - kind: Gateway
+    name: hosts
+  hostnames:
+  - "two.example.com"
+  rules:
+  - backendRefs:
+    - name: two
+      port: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: one
+spec:
+  type: ClusterIP
+  selector:
+    app: one
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: one
+  labels:
+    app: one
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: one
+  template:
+    metadata:
+      labels:
+        app: one
+    spec:
+      containers:
+      - name: echo
+        image: mendhak/http-https-echo:latest
+        env:
+        - name: HTTP_PORT
+          value: "8080"
+        - name: HTTPS_PORT
+          value: "8443"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: two
+spec:
+  type: ClusterIP
+  selector:
+    app: two
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: two
+  labels:
+    app: two
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: two
+  template:
+    metadata:
+      labels:
+        app: two
+    spec:
+      containers:
+      - name: echo
+        image: mendhak/http-https-echo:latest
+        env:
+        - name: HTTP_PORT
+          value: "8080"
+        - name: HTTPS_PORT
+          value: "8443"
